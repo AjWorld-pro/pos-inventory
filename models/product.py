@@ -16,6 +16,7 @@ class Product:
     """Represents a product in the inventory system."""
 
     LOW_STOCK_DEFAULT = 10
+    DEFAULT_IMAGE = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop"
 
     def __init__(self, name: str, category: str, price: float, quantity: int,
                  description: str = "", image: str = "", low_stock_threshold: int = None,
@@ -26,7 +27,7 @@ class Product:
         self.price = round(float(price), 2)
         self.quantity = int(quantity)
         self.description = description
-        self.image = image or "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop"
+        self.image = image or self.DEFAULT_IMAGE
         self.low_stock_threshold = low_stock_threshold or self.LOW_STOCK_DEFAULT
         self.created_at = created_at or datetime.utcnow().isoformat()
         self.updated_at = updated_at or datetime.utcnow().isoformat()

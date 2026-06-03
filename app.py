@@ -53,7 +53,14 @@ def seed_data():
         print("[OK] Admin user seeded: admin / admin123")
 
     # Seed products
-    if not Product.get_all():
+    existing = Product.get_all()
+    if existing:
+        first = existing[0]
+        if first.image == Product.DEFAULT_IMAGE:
+            for p in existing:
+                p.delete()
+            existing = []
+    if not existing:
         sample_products = [
             {"name": "MacBook Pro 14\"", "category": "Electronics", "price": 1999.99, "quantity": 15, "description": "Apple M3 Pro chip, 18GB RAM", "low_stock_threshold": 5, "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=600&h=400&fit=crop"},
             {"name": "iPhone 15 Pro", "category": "Electronics", "price": 1199.99, "quantity": 30, "description": "Titanium design, 48MP camera", "low_stock_threshold": 8, "image": "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=600&h=400&fit=crop"},
