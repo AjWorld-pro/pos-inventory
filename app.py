@@ -55,8 +55,9 @@ def seed_data():
     # Seed products
     existing = Product.get_all()
     if existing:
-        first = existing[0]
-        if first.image == Product.DEFAULT_IMAGE:
+        broken_ids = ["1556306535-0f09f53773c0", "1602523961358-f9f03f3a9f08"]
+        has_broken = any(b in p.image for p in existing for b in broken_ids)
+        if has_broken:
             for p in existing:
                 p.delete()
             existing = []
@@ -70,7 +71,7 @@ def seed_data():
             {"name": "Men's Polo Shirt", "category": "Clothing & Apparel", "price": 34.99, "quantity": 80, "description": "Premium cotton blend", "low_stock_threshold": 15, "image": "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=600&h=400&fit=crop"},
             {"name": "Women's Sneakers", "category": "Clothing & Apparel", "price": 89.99, "quantity": 45, "description": "Comfortable everyday sneakers", "low_stock_threshold": 10, "image": "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=600&h=400&fit=crop"},
             {"name": "Denim Jacket", "category": "Clothing & Apparel", "price": 74.99, "quantity": 8, "description": "Classic fit, stonewashed", "low_stock_threshold": 10, "image": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=600&h=400&fit=crop"},
-            {"name": "Sports Running Cap", "category": "Clothing & Apparel", "price": 19.99, "quantity": 60, "description": "Moisture-wicking fabric", "low_stock_threshold": 15, "image": "https://images.unsplash.com/photo-1556306535-0f09f53773c0?w=600&h=400&fit=crop"},
+            {"name": "Sports Running Cap", "category": "Clothing & Apparel", "price": 19.99, "quantity": 60, "description": "Moisture-wicking fabric", "low_stock_threshold": 15, "image": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&h=400&fit=crop"},
             {"name": "Organic Green Tea", "category": "Food & Beverages", "price": 12.99, "quantity": 120, "description": "Premium Japanese matcha blend", "low_stock_threshold": 20, "image": "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=600&h=400&fit=crop"},
             {"name": "Cold Brew Coffee 500ml", "category": "Food & Beverages", "price": 6.99, "quantity": 85, "description": "Single origin Ethiopian beans", "low_stock_threshold": 20, "image": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=600&h=400&fit=crop"},
             {"name": "Protein Bar Pack x12", "category": "Food & Beverages", "price": 24.99, "quantity": 40, "description": "Chocolate fudge, 20g protein", "low_stock_threshold": 10, "image": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&h=400&fit=crop"},
@@ -81,7 +82,7 @@ def seed_data():
             {"name": "LEGO Architecture Set", "category": "Toys & Games", "price": 69.99, "quantity": 18, "description": "789 pieces, age 12+", "low_stock_threshold": 5, "image": "https://images.unsplash.com/photo-1558060370-d644479cb6f7?w=600&h=400&fit=crop"},
             {"name": "Desk Organizer Bamboo", "category": "Office Supplies", "price": 27.99, "quantity": 33, "description": "Eco-friendly bamboo organizer", "low_stock_threshold": 8, "image": "https://images.unsplash.com/photo-1544816155-12df9643f363?w=600&h=400&fit=crop"},
             {"name": "Mechanical Keyboard", "category": "Office Supplies", "price": 119.99, "quantity": 14, "description": "TKL layout, Cherry MX switches", "low_stock_threshold": 5, "image": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=600&h=400&fit=crop"},
-            {"name": "Scented Candle Set", "category": "Home & Garden", "price": 38.99, "quantity": 3, "description": "Set of 3, 40hr burn time", "low_stock_threshold": 8, "image": "https://images.unsplash.com/photo-1602523961358-f9f03f3a9f08?w=600&h=400&fit=crop"},
+            {"name": "Scented Candle Set", "category": "Home & Garden", "price": 38.99, "quantity": 3, "description": "Set of 3, 40hr burn time", "low_stock_threshold": 8, "image": "https://images.unsplash.com/photo-1603006905003-be475563bc59?w=600&h=400&fit=crop"},
         ]
         for p in sample_products:
             Product.create(**p)
