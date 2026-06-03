@@ -5,8 +5,7 @@ import json
 import os
 from typing import List, Dict, Any, Optional
 
-RENDER_DISK = "/opt/render/project/src/data"
-DATA_DIR = RENDER_DISK if os.path.isdir(RENDER_DISK) else os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+DATA_DIR = os.environ.get("DATA_DIR") or os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 
 
 class Storage:
