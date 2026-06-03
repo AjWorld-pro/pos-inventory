@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POSIFY — Point of Sale</title>
+  <link rel="stylesheet" href="/css/main.css" />
+  <style>
+    .pos-layout { display:grid;grid-template-columns:1fr 360px;gap:0;height:calc(100vh - var(--topbar-height));overflow:hidden; }
+    .pos-products { overflow-y:auto;padding:16px; }
+    .pos-cart { background:var(--white);border-left:1px solid var(--gray-200);display:flex;flex-direction:column;overflow:hidden; }
+    .pos-cart-header { padding:14px 18px;border-bottom:1px solid var(--gray-100);flex-shrink:0; }
+    .pos-cart-items { flex:1;overflow-y:auto;padding:6px 18px; }
+    .pos-cart-footer { padding:12px 18px;border-top:1px solid var(--gray-200);background:var(--gray-50);flex-shrink:0; }
+    .cart-summary-row { display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0; }
+    .cart-total-row { display:flex;justify-content:space-between;align-items:center;padding:8px 0 6px;border-top:2px solid var(--gray-200);margin-top:6px; }
+    .cart-total-amount { font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--primary); }
+    .payment-methods { display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0; }
+    .pay-method { padding:8px 6px;text-align:center;border:2px solid var(--gray-200);border-radius:var(--radius-sm);cursor:pointer;font-size:12px;font-weight:600;color:var(--gray-600);transition:all var(--transition);background:var(--white); }
+    .pay-method:hover { border-color:var(--primary);color:var(--primary); }
+    .pay-method.active { border-color:var(--primary);background:var(--primary);color:var(--white); }
+    .pos-search { position:relative;margin-bottom:12px; }
+    .pos-search input { width:100%;padding:8px 14px 8px 38px;border:1.5px solid var(--gray-200);border-radius:var(--radius);font-family:var(--font-body);font-size:14px;outline:none;background:var(--white); }
+    .pos-search input:focus { border-color:var(--primary);box-shadow:0 0 0 3px rgba(5,150,105,0.1); }
+    .pos-search .icon { position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px; }
+    .cat-pills { display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:4px; }
+    .cat-pill { padding:5px 14px;border-radius:20px;background:var(--white);border:1.5px solid var(--gray-200);font-size:12px;font-weight:600;color:var(--gray-600);cursor:pointer;white-space:nowrap;transition:all var(--transition); }
+    .cat-pill.active { background:var(--primary);border-color:var(--primary);color:var(--white); }
+    .pos-product-card { background:var(--white);border:1.5px solid var(--gray-100);border-radius:var(--radius);padding:10px;cursor:pointer;transition:all var(--transition);display:flex;flex-direction:column;gap:6px; }
+    .pos-product-card:hover { border-color:var(--primary);box-shadow:var(--shadow);transform:translateY(-2px); }
+    .pos-product-card.out-of-stock { opacity:0.5;cursor:not-allowed; }
+    .pos-products-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px; }
+    .receipt-modal .modal { max-width:400px; }
+    @media(max-width:900px) { .pos-layout { grid-template-columns:1fr;height:auto; } .pos-cart { height:auto;border-left:none;border-top:1px solid var(--gray-200); } }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="app-sidebar"></aside>
+  <main class="main-content" style="overflow:hidden">
+    <div class="topbar">
+      <button class="mobile-menu-btn btn-icon" id="mobile-menu-btn">☰</button>
+      <div class="topbar-title">
+        <h1>Point of Sale</h1>
+        <p id="pos-datetime">Loading…</p>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-outline btn-sm" onclick="clearCart()">🗑 Clear Cart</button>
+      </div>
+    </div>
+
+    <div class="pos-layout">
+      <!-- Left: Product Catalog -->
+      <div class="pos-products">
+        <div class="pos-search">
+          <span class="icon">🔍</span>
+          <input type="text" placeholder="Search products by name or scan barcode…" id="pos-search" oninput="filterPosProducts(this.value)" />
+        </div>
+        <div class="cat-pills" id="cat-pills"></div>
+        <div class="pos-products-grid" id="pos-products-grid">
+          <div class="loading-center"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Right: Cart -->
+      <div class="pos-cart">
+        <div class="pos-cart-header">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-family:var(--font-display);font-size:17px;color:var(--gray-900)">🛒 Cart</div>
+            <span class="badge badge-green" id="cart-count">0 items</span>
+          </div>
+        </div>
+
+        <div class="pos-cart-items" id="cart-items">
+          <div class="empty-state" style="padding:40px 20px">
+            <div class="empty-state-icon">🛒</div>
+            <h3>Cart is empty</h3>
+            <p>Click products to add them</p>
+          </div>
+        </div>
+
+        <div class="pos-cart-footer">
+          <div class="cart-summary-row"><span>Subtotal</span><span id="cart-subtotal">$0.00</span></div>
+          <div class="cart-summary-row">
+            <span>Discount ($)</span>
+            <input type="number" id="cart-discount" value="0" min="0" step="0.01" style="width:80px;padding:4px 8px;border:1px solid var(--gray-200);border-radius:6px;font-size:13px;text-align:right" oninput="updateCartTotals()" />
+          </div>
+          <div class="cart-summary-row">
+            <span>Tax</span>
+            <select id="cart-tax" onchange="updateCartTotals()" style="padding:4px 8px;border:1px solid var(--gray-200);border-radius:6px;font-size:13px">
+              <option value="0">No Tax</option>
+              <option value="0.05">5%</option>
+              <option value="0.075">7.5%</option>
+              <option value="0.1">10%</option>
+            </select>
+          </div>
+          <div class="cart-total-row">
+            <span style="font-size:15px;font-weight:700;color:var(--gray-800)">TOTAL</span>
+            <span class="cart-total-amount" id="cart-total">$0.00</span>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-size:12px;font-weight:600;color:var(--gray-500);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase">Payment Method</div>
+            <div class="payment-methods">
+              <div class="pay-method active" onclick="selectPayment('cash')">💵 Cash</div>
+              <div class="pay-method" onclick="selectPayment('card')">💳 Card</div>
+              <div class="pay-method" onclick="selectPayment('transfer')">📲 Transfer</div>
+            </div>
+          </div>
+          <div id="cash-input-group" style="margin-bottom:10px">
+            <label class="form-label">Amount Paid ($)</label>
+            <input type="number" class="form-control" id="amount-paid" placeholder="Enter amount…" min="0" step="0.01" oninput="updateChange()" />
+            <div id="change-display" style="display:none;margin-top:8px;padding:8px 12px;background:var(--primary-bg);border-radius:8px;font-size:14px;font-weight:700;color:var(--primary)"></div>
+          </div>
+          <button class="btn btn-primary w-100 btn-lg" onclick="processCheckout()" id="checkout-btn" disabled>
+            Complete Sale →
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Receipt Modal -->
+<div class="modal-overlay receipt-modal" id="receipt-modal-overlay">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">✅ Sale Complete!</div>
+      <button class="modal-close" onclick="closeReceipt()">✕</button>
+    </div>
+    <div class="modal-body" id="receipt-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="printReceipt()">🖨 Print</button>
+      <button class="btn btn-primary" onclick="closeReceipt()">New Sale</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+requireAuth();
+initSidebar('pos');
+
+const CATEGORIES = ['All','Electronics','Clothing & Apparel','Food & Beverages','Health & Beauty','Home & Garden','Sports & Outdoors','Toys & Games','Office Supplies','Automotive','Books & Media'];
+let allProducts = [];
+let cartItems = {};
+let selectedPayment = 'cash';
+let activeCat = 'All';
+
+document.getElementById('pos-datetime').textContent = new Date().toLocaleString('en-US',{weekday:'long',year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+
+async function loadProducts() {
+  try {
+    const { products } = await Api.getProducts();
+    allProducts = products;
+    buildCatPills();
+    renderPosProducts(products);
+  } catch(e) { showToast('Error loading products','error'); }
+}
+
+function buildCatPills() {
+  document.getElementById('cat-pills').innerHTML = CATEGORIES.map(c=>`
+    <div class="cat-pill ${c===activeCat?'active':''}" onclick="filterByCat('${c}')">${CATEGORY_ICONS[c]||''} ${c}</div>`).join('');
+}
+
+function filterByCat(cat) {
+  activeCat = cat;
+  buildCatPills();
+  const filtered = cat==='All' ? allProducts : allProducts.filter(p=>p.category===cat);
+  const q = document.getElementById('pos-search').value;
+  renderPosProducts(q ? filtered.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())) : filtered);
+}
+
+function filterPosProducts(q) {
+  const base = activeCat==='All' ? allProducts : allProducts.filter(p=>p.category===activeCat);
+  renderPosProducts(q ? base.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())) : base);
+}
+
+function renderPosProducts(products) {
+  const grid = document.getElementById('pos-products-grid');
+  if (!products.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🔍</div><h3>No products found</h3></div>';
+    return;
+  }
+  grid.innerHTML = products.map(p=>`
+    <div class="pos-product-card ${p.is_out_of_stock?'out-of-stock':''}" onclick="${p.is_out_of_stock?'showToast(\'Out of stock\',\'warning\')':'addToCart(\''+p.id+'\')'}">
+      <div style="width:100%;height:100px;background:var(--gray-100);border-radius:8px;overflow:hidden"><img src="${p.image}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.remove();this.parentElement.innerHTML='${CATEGORY_ICONS[p.category]||'📦'}';this.parentElement.style.display='flex';this.parentElement.style.alignItems='center';this.parentElement.style.justifyContent='center';this.parentElement.style.fontSize='32px'" /></div>
+      <div style="font-size:13.5px;font-weight:600;color:var(--gray-900);line-height:1.3">${p.name}</div>
+      <div style="font-size:12px;color:var(--gray-500)">${p.category}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        <div style="font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--primary)">${formatCurrency(p.price)}</div>
+        <span class="badge ${p.is_out_of_stock?'badge-red':p.is_low_stock?'badge-gold':'badge-gray'}" style="font-size:10px">${p.is_out_of_stock?'Out':p.quantity+' left'}</span>
+      </div>
+    </div>`).join('');
+}
+
+function addToCart(productId) {
+  const product = allProducts.find(p=>p.id===productId);
+  if (!product || product.is_out_of_stock) return;
+  if (cartItems[productId]) {
+    if (cartItems[productId].quantity >= product.quantity) { showToast('Not enough stock','warning'); return; }
+    cartItems[productId].quantity++;
+    cartItems[productId].subtotal = cartItems[productId].price * cartItems[productId].quantity;
+  } else {
+    cartItems[productId] = { product_id:productId, product_name:product.name, price:product.price, quantity:1, subtotal:product.price, image:product.image, category:product.category };
+  }
+  renderCart();
+  showToast(`${product.name} added to cart`,'success',1500);
+}
+
+function updateQty(productId, delta) {
+  if (!cartItems[productId]) return;
+  cartItems[productId].quantity += delta;
+  if (cartItems[productId].quantity <= 0) { delete cartItems[productId]; }
+  else { cartItems[productId].subtotal = cartItems[productId].price * cartItems[productId].quantity; }
+  renderCart();
+}
+
+function removeFromCart(productId) { delete cartItems[productId]; renderCart(); }
+
+function clearCart() { cartItems = {}; renderCart(); }
+
+function renderCart() {
+  const items = Object.values(cartItems);
+  const el = document.getElementById('cart-items');
+  const countEl = document.getElementById('cart-count');
+  countEl.textContent = items.length + ' item' + (items.length!==1?'s':'');
+  if (!items.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:40px 20px"><div class="empty-state-icon">🛒</div><h3>Cart is empty</h3><p>Click products to add them</p></div>';
+    document.getElementById('checkout-btn').disabled = true;
+    updateCartTotals(); return;
+  }
+  el.innerHTML = items.map(item=>`
+    <div class="cart-item">
+      <div class="cart-item-img" style="overflow:hidden"><img src="${item.image}" alt="${item.product_name}" style="width:100%;height:100%;object-fit:cover" onerror="this.remove();this.parentElement.style.display='flex';this.parentElement.style.alignItems='center';this.parentElement.style.justifyContent='center';this.parentElement.style.fontSize='22px';this.parentElement.textContent='${CATEGORY_ICONS[item.category]||'📦'}'" /></div>
+      <div class="cart-item-info">
+        <div class="cart-item-name">${item.product_name}</div>
+        <div class="cart-item-price">${formatCurrency(item.price)} each</div>
+      </div>
+      <div class="qty-control">
+        <button class="qty-btn" onclick="updateQty('${item.product_id}',-1)">−</button>
+        <span class="qty-value">${item.quantity}</span>
+        <button class="qty-btn" onclick="updateQty('${item.product_id}',1)">+</button>
+      </div>
+      <div class="cart-item-total">${formatCurrency(item.subtotal)}</div>
+      <button onclick="removeFromCart('${item.product_id}')" style="background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:18px;padding:4px;line-height:1">×</button>
+    </div>`).join('');
+  document.getElementById('checkout-btn').disabled = false;
+  updateCartTotals();
+}
+
+function updateCartTotals() {
+  const items = Object.values(cartItems);
+  const subtotal = items.reduce((s,i)=>s+i.subtotal,0);
+  const discount = parseFloat(document.getElementById('cart-discount').value)||0;
+  const taxRate = parseFloat(document.getElementById('cart-tax').value)||0;
+  const taxAmount = (subtotal - discount) * taxRate;
+  const total = Math.max(0, subtotal - discount + taxAmount);
+  document.getElementById('cart-subtotal').textContent = formatCurrency(subtotal);
+  document.getElementById('cart-total').textContent = formatCurrency(total);
+  updateChange();
+}
+
+function updateChange() {
+  const total = parseFloat(document.getElementById('cart-total').textContent.replace(/[^0-9.]/g,''))||0;
+  const paid = parseFloat(document.getElementById('amount-paid').value)||0;
+  const changeEl = document.getElementById('change-display');
+  if (selectedPayment==='cash' && paid > 0 && total > 0) {
+    const change = paid - total;
+    changeEl.style.display = 'block';
+    changeEl.style.background = change >= 0 ? 'var(--primary-bg)' : 'var(--danger-bg)';
+    changeEl.style.color = change >= 0 ? 'var(--primary)' : 'var(--danger)';
+    changeEl.textContent = change >= 0 ? `Change: ${formatCurrency(change)}` : `⚠ Short by: ${formatCurrency(Math.abs(change))}`;
+  } else { changeEl.style.display='none'; }
+}
+
+function selectPayment(method) {
+  selectedPayment = method;
+  document.querySelectorAll('.pay-method').forEach(el=>el.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('cash-input-group').style.display = method==='cash' ? 'block' : 'none';
+}
+
+async function processCheckout() {
+  const items = Object.values(cartItems);
+  if (!items.length) return;
+  const subtotal = items.reduce((s,i)=>s+i.subtotal,0);
+  const discount = parseFloat(document.getElementById('cart-discount').value)||0;
+  const taxRate = parseFloat(document.getElementById('cart-tax').value)||0;
+  const total = Math.max(0, subtotal*(1+taxRate) - discount*(1+taxRate));
+  const amountPaid = selectedPayment==='cash' ? (parseFloat(document.getElementById('amount-paid').value)||0) : total;
+  if (selectedPayment==='cash' && amountPaid < total) { showToast('Amount paid is less than total','error'); return; }
+  const btn = document.getElementById('checkout-btn');
+  btn.disabled=true; btn.textContent='Processing…';
+  try {
+    const { transaction } = await Api.createTransaction({
+      items: items.map(i=>({product_id:i.product_id,quantity:i.quantity})),
+      payment_method: selectedPayment,
+      amount_paid: amountPaid,
+      discount,
+      tax_rate: taxRate,
+    });
+    showReceipt(transaction);
+    clearCart();
+    loadProducts(); // refresh stock
+  } catch(e) { showToast(e.message,'error'); }
+  finally { btn.disabled=false; btn.textContent='Complete Sale →'; }
+}
+
+function showReceipt(txn) {
+  const body = document.getElementById('receipt-body');
+  body.innerHTML = `
+    <div class="receipt">
+      <div class="receipt-header">
+        <div class="receipt-logo">🏪 POSIFY</div>
+        <div class="receipt-sub">Point of Sale System</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:4px">${formatDateTime(txn.created_at)}</div>
+      </div>
+      <hr class="receipt-divider" />
+      <div style="margin-bottom:8px">
+        <div style="font-size:11px;color:var(--gray-500)">Receipt: <strong>${txn.receipt_number}</strong></div>
+        <div style="font-size:11px;color:var(--gray-500)">Cashier: <strong>${txn.cashier_name}</strong></div>
+      </div>
+      <hr class="receipt-divider" />
+      ${txn.items.map(i=>`
+        <div class="receipt-item">
+          <span>${i.product_name} × ${i.quantity}</span>
+          <span>${formatCurrency(i.subtotal)}</span>
+        </div>`).join('')}
+      <hr class="receipt-divider" />
+      <div class="receipt-item"><span>Subtotal</span><span>${formatCurrency(txn.subtotal)}</span></div>
+      ${txn.discount>0?`<div class="receipt-item"><span>Discount</span><span>-${formatCurrency(txn.discount)}</span></div>`:''}
+      ${txn.tax>0?`<div class="receipt-item"><span>Tax</span><span>${formatCurrency(txn.tax)}</span></div>`:''}
+      <div class="receipt-item receipt-total" style="margin-top:8px"><span>TOTAL</span><span style="color:var(--primary)">${formatCurrency(txn.total)}</span></div>
+      <div class="receipt-item"><span>Paid (${txn.payment_method})</span><span>${formatCurrency(txn.amount_paid)}</span></div>
+      ${txn.change>0?`<div class="receipt-item"><span>Change</span><span>${formatCurrency(txn.change)}</span></div>`:''}
+      <hr class="receipt-divider" />
+      <div class="receipt-footer">Thank you for your purchase!<br>Come back soon 🌿</div>
+    </div>`;
+  document.getElementById('receipt-modal-overlay').classList.add('active');
+}
+
+function closeReceipt() { document.getElementById('receipt-modal-overlay').classList.remove('active'); }
+function printReceipt() { window.print(); }
+
+loadProducts();
+</script>
+</body>
+</html>

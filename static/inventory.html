@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POSIFY — Inventory</title>
+  <link rel="stylesheet" href="/css/main.css" />
+  <style>
+    .view-toggle { display:flex; gap:3px; }
+    .view-btn { width:30px;height:30px;border:1.5px solid var(--gray-200);background:var(--white);border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--gray-500);transition:all var(--transition); }
+    .view-btn.active { background:var(--primary);border-color:var(--primary);color:var(--white); }
+    .filter-bar { display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px; }
+    .filter-bar input, .filter-bar select { min-width:150px; }
+    .img-preview { width:48px;height:48px;border-radius:6px;object-fit:cover;background:var(--primary-bg);display:flex;align-items:center;justify-content:center;font-size:22px; }
+    .action-btns { display:flex;gap:4px; }
+    .restock-form { display:flex;gap:6px;align-items:center; }
+    .restock-form input { width:70px; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="app-sidebar"></aside>
+  <main class="main-content">
+    <div class="topbar">
+      <button class="mobile-menu-btn btn-icon" id="mobile-menu-btn">☰</button>
+      <div class="topbar-title">
+        <h1>Inventory</h1>
+        <p>Manage your product catalog</p>
+      </div>
+      <div class="topbar-search">
+        <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="Search products…" id="search-input" oninput="handleSearch(this.value)" />
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary" onclick="openProductModal()" id="add-product-btn">+ Add Product</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <!-- Stats row -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+        <div class="stat-card"><div class="stat-icon green">📦</div><div class="stat-info"><div class="stat-value" id="s-total">—</div><div class="stat-label">Total Products</div></div></div>
+        <div class="stat-card"><div class="stat-icon gold">💵</div><div class="stat-info"><div class="stat-value" id="s-value">—</div><div class="stat-label">Inventory Value</div></div></div>
+        <div class="stat-card"><div class="stat-icon red">⚠️</div><div class="stat-info"><div class="stat-value" id="s-low">—</div><div class="stat-label">Low Stock</div></div></div>
+        <div class="stat-card"><div class="stat-icon blue">🗂</div><div class="stat-info"><div class="stat-value" id="s-cats">—</div><div class="stat-label">Categories</div></div></div>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-bar">
+        <input type="text" class="form-control" id="filter-search" placeholder="🔍 Search by name…" oninput="applyFilters()" style="max-width:220px" />
+        <select class="form-control" id="filter-cat" onchange="applyFilters()" style="max-width:200px">
+          <option value="">All Categories</option>
+        </select>
+        <select class="form-control" id="filter-stock" onchange="applyFilters()" style="max-width:160px">
+          <option value="">All Stock</option>
+          <option value="low">Low Stock</option>
+          <option value="out">Out of Stock</option>
+          <option value="ok">In Stock</option>
+        </select>
+        <div class="view-toggle" style="margin-left:auto">
+          <button class="view-btn active" id="btn-grid" onclick="setView('grid')" title="Grid view">⊞</button>
+          <button class="view-btn" id="btn-list" onclick="setView('list')" title="List view">☰</button>
+        </div>
+      </div>
+
+      <!-- Products container -->
+      <div id="products-container">
+        <div class="loading-center"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add/Edit Product Modal -->
+<div class="modal-overlay" id="product-modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="product-modal-title">Add New Product</div>
+      <button class="modal-close" onclick="closeProductModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="product-id" />
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Product Name *</label>
+          <input type="text" class="form-control" id="p-name" placeholder="e.g. iPhone 15 Pro" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category *</label>
+          <select class="form-control" id="p-category">
+            <option value="">Select category</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Price ($) *</label>
+          <input type="number" class="form-control" id="p-price" placeholder="0.00" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Quantity *</label>
+          <input type="number" class="form-control" id="p-quantity" placeholder="0" min="0" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" id="p-description" rows="2" placeholder="Short product description…"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Image URL</label>
+        <input type="url" class="form-control" id="p-image" placeholder="https://…" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Low Stock Threshold</label>
+        <input type="number" class="form-control" id="p-threshold" placeholder="10" min="1" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeProductModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProduct()" id="save-product-btn">Save Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="delete-modal-overlay">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Delete Product?</div>
+      <button class="modal-close" onclick="closeDeleteModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--gray-600)">Are you sure you want to delete <strong id="delete-product-name"></strong>? This cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Delete Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- Restock Modal -->
+<div class="modal-overlay" id="restock-modal-overlay">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title">Restock Product</div>
+      <button class="modal-close" onclick="closeRestockModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--gray-600);margin-bottom:16px">Restocking: <strong id="restock-product-name"></strong></p>
+      <div class="form-group">
+        <label class="form-label">Add Quantity</label>
+        <input type="number" class="form-control" id="restock-qty" placeholder="Enter amount to add" min="1" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeRestockModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmRestock()">Restock</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+requireAuth();
+initSidebar('inventory');
+
+const CATEGORIES = ['Electronics','Clothing & Apparel','Food & Beverages','Health & Beauty','Home & Garden','Sports & Outdoors','Toys & Games','Office Supplies','Automotive','Books & Media'];
+
+let allProducts = [];
+let filteredProducts = [];
+let currentView = 'grid';
+let deleteTargetId = null;
+let restockTargetId = null;
+const currentUserRole = (Api.getUser() || {}).role;
+const canManage = currentUserRole === 'manager' || currentUserRole === 'admin';
+if (!canManage) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const addBtn = document.getElementById('add-product-btn');
+    if (addBtn) addBtn.style.display = 'none';
+  });
+}
+
+async function loadInventory() {
+  try {
+    const [{ products }, stats] = await Promise.all([Api.getProducts(), Api.getProductStats()]);
+    allProducts = products;
+    filteredProducts = [...products];
+    document.getElementById('s-total').textContent = stats.total_products;
+    document.getElementById('s-value').textContent = formatCurrency(stats.total_inventory_value);
+    document.getElementById('s-low').textContent = stats.low_stock_count;
+    document.getElementById('s-cats').textContent = stats.categories_count;
+    populateCategoryFilter();
+    renderProducts();
+  } catch(e) { showToast('Error loading inventory: '+e.message,'error'); }
+}
+
+function populateCategoryFilter() {
+  const sel = document.getElementById('filter-cat');
+  const pSel = document.getElementById('p-category');
+  CATEGORIES.forEach(c => {
+    sel.innerHTML += `<option value="${c}">${c}</option>`;
+    pSel.innerHTML += `<option value="${c}">${CATEGORY_ICONS[c]||''} ${c}</option>`;
+  });
+}
+
+function applyFilters() {
+  const q = document.getElementById('filter-search').value.toLowerCase();
+  const cat = document.getElementById('filter-cat').value;
+  const stock = document.getElementById('filter-stock').value;
+  filteredProducts = allProducts.filter(p => {
+    const matchQ = !q || p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q);
+    const matchCat = !cat || p.category === cat;
+    const matchStock = !stock || (stock==='low' && p.is_low_stock && !p.is_out_of_stock) || (stock==='out' && p.is_out_of_stock) || (stock==='ok' && !p.is_low_stock);
+    return matchQ && matchCat && matchStock;
+  });
+  renderProducts();
+}
+
+function handleSearch(q) {
+  document.getElementById('filter-search').value = q;
+  applyFilters();
+}
+
+function setView(view) {
+  currentView = view;
+  document.getElementById('btn-grid').classList.toggle('active', view==='grid');
+  document.getElementById('btn-list').classList.toggle('active', view==='list');
+  renderProducts();
+}
+
+function renderProducts() {
+  const container = document.getElementById('products-container');
+  if (!filteredProducts.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📦</div><h3>No products found</h3><p>Try adjusting your search or filters</p>${canManage ? '<button class="btn btn-primary" onclick="openProductModal()">+ Add Product</button>' : ''}</div>`;
+    return;
+  }
+  if (currentView === 'grid') renderGrid(container);
+  else renderList(container);
+}
+
+function renderGrid(container) {
+  container.innerHTML = `<div class="products-grid">${filteredProducts.map(p=>`
+    <div class="product-card">
+      <div class="product-card-img-placeholder"><img src="${p.image}" alt="${p.name}" onerror="this.remove();this.parentElement.textContent='${CATEGORY_ICONS[p.category]||'📦'}'" /></div>
+      <div class="product-card-body">
+        <div class="product-card-category">${p.category}</div>
+        <div class="product-card-name" title="${p.name}">${p.name}</div>
+        ${p.description ? `<div style="font-size:12px;color:var(--gray-500);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.description}</div>` : ''}
+        <div class="product-card-footer" style="margin-bottom:10px">
+          <div class="product-price">${formatCurrency(p.price)}</div>
+          <span class="badge ${p.is_out_of_stock?'badge-red':p.is_low_stock?'badge-gold':'badge-green'}">${p.is_out_of_stock?'Out of Stock':p.is_low_stock?'Low Stock':'In Stock'}</span>
+        </div>
+        <div style="font-size:12px;color:var(--gray-500);margin-bottom:12px">Qty: <strong style="color:var(--gray-800)">${p.quantity}</strong></div>
+        <div class="action-btns">
+          ${canManage ? `<button class="btn btn-outline btn-sm" onclick="openRestockModal('${p.id}','${p.name.replace(/'/g,"\\'")}')">📦 Restock</button>` : ''}
+          ${canManage ? `<button class="btn btn-outline btn-sm" onclick="openEditModal('${p.id}')">✏️</button>` : ''}
+          ${canManage ? `<button class="btn btn-danger btn-sm" onclick="openDeleteModal('${p.id}','${p.name.replace(/'/g,"\\'")}')">🗑</button>` : ''}
+        </div>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function renderList(container) {
+  container.innerHTML = `<div class="card">
+    <div class="table-wrapper">
+      <table>
+        <thead><tr>
+          <th>Product</th><th>Category</th><th>Price</th><th>Quantity</th><th>Status</th><th>Actions</th>
+        </tr></thead>
+        <tbody>${filteredProducts.map(p=>`
+          <tr>
+            <td>
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:40px;height:40px;border-radius:8px;background:var(--primary-bg);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;overflow:hidden"><img src="${p.image}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.remove();this.parentElement.textContent='${CATEGORY_ICONS[p.category]||'📦'}'" /></div>
+                <div>
+                  <div style="font-weight:600;color:var(--gray-900);font-size:14px">${p.name}</div>
+                  <div style="font-size:12px;color:var(--gray-400)">${p.description||'—'}</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="badge badge-green">${p.category}</span></td>
+            <td style="font-weight:700;color:var(--primary)">${formatCurrency(p.price)}</td>
+            <td style="font-weight:600">${p.quantity}</td>
+            <td><span class="badge ${p.is_out_of_stock?'badge-red':p.is_low_stock?'badge-gold':'badge-green'}">${p.is_out_of_stock?'Out of Stock':p.is_low_stock?'Low Stock':'In Stock'}</span></td>
+            <td>
+              <div class="action-btns">
+                ${canManage ? `<button class="btn btn-outline btn-sm" onclick="openRestockModal('${p.id}','${p.name.replace(/'/g,"\\'")}')">📦</button>` : ''}
+                ${canManage ? `<button class="btn btn-outline btn-sm" onclick="openEditModal('${p.id}')">✏️</button>` : ''}
+                ${canManage ? `<button class="btn btn-danger btn-sm" onclick="openDeleteModal('${p.id}','${p.name.replace(/'/g,"\\'")}')">🗑</button>` : ''}
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// --- Product Modal ---
+function openProductModal(prefillId=null) {
+  document.getElementById('product-modal-title').textContent = 'Add New Product';
+  document.getElementById('product-id').value = '';
+  ['name','description','image'].forEach(f=>document.getElementById('p-'+f).value='');
+  document.getElementById('p-price').value='';
+  document.getElementById('p-quantity').value='';
+  document.getElementById('p-threshold').value='10';
+  document.getElementById('p-category').value='';
+  document.getElementById('product-modal-overlay').classList.add('active');
+}
+
+async function openEditModal(id) {
+  try {
+    const { product: p } = await Api.getProduct(id);
+    document.getElementById('product-modal-title').textContent = 'Edit Product';
+    document.getElementById('product-id').value = p.id;
+    document.getElementById('p-name').value = p.name;
+    document.getElementById('p-category').value = p.category;
+    document.getElementById('p-price').value = p.price;
+    document.getElementById('p-quantity').value = p.quantity;
+    document.getElementById('p-description').value = p.description||'';
+    document.getElementById('p-image').value = p.image||'';
+    document.getElementById('p-threshold').value = p.low_stock_threshold||10;
+    document.getElementById('product-modal-overlay').classList.add('active');
+  } catch(e) { showToast('Error loading product','error'); }
+}
+
+function closeProductModal() { document.getElementById('product-modal-overlay').classList.remove('active'); }
+
+async function saveProduct() {
+  const id = document.getElementById('product-id').value;
+  const data = {
+    name: document.getElementById('p-name').value.trim(),
+    category: document.getElementById('p-category').value,
+    price: parseFloat(document.getElementById('p-price').value),
+    quantity: parseInt(document.getElementById('p-quantity').value),
+    description: document.getElementById('p-description').value.trim(),
+    image: document.getElementById('p-image').value.trim(),
+    low_stock_threshold: parseInt(document.getElementById('p-threshold').value)||10,
+  };
+  if (!data.name || !data.category || isNaN(data.price) || isNaN(data.quantity)) {
+    showToast('Please fill in all required fields','warning'); return;
+  }
+  const btn = document.getElementById('save-product-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+  try {
+    if (id) await Api.updateProduct(id, data);
+    else await Api.createProduct(data);
+    showToast(id ? 'Product updated!' : 'Product added!', 'success');
+    closeProductModal();
+    loadInventory();
+  } catch(e) { showToast(e.message,'error'); }
+  finally { btn.disabled=false; btn.textContent='Save Product'; }
+}
+
+// --- Delete Modal ---
+function openDeleteModal(id, name) {
+  deleteTargetId = id;
+  document.getElementById('delete-product-name').textContent = name;
+  document.getElementById('delete-modal-overlay').classList.add('active');
+}
+function closeDeleteModal() { document.getElementById('delete-modal-overlay').classList.remove('active'); }
+async function confirmDelete() {
+  try {
+    await Api.deleteProduct(deleteTargetId);
+    showToast('Product deleted','success');
+    closeDeleteModal();
+    loadInventory();
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+// --- Restock Modal ---
+function openRestockModal(id, name) {
+  restockTargetId = id;
+  document.getElementById('restock-product-name').textContent = name;
+  document.getElementById('restock-qty').value='';
+  document.getElementById('restock-modal-overlay').classList.add('active');
+}
+function closeRestockModal() { document.getElementById('restock-modal-overlay').classList.remove('active'); }
+async function confirmRestock() {
+  const qty = parseInt(document.getElementById('restock-qty').value);
+  if (!qty || qty < 1) { showToast('Enter a valid quantity','warning'); return; }
+  try {
+    const { product: p } = await Api.getProduct(restockTargetId);
+    await Api.updateProduct(restockTargetId, { quantity: p.quantity + qty });
+    showToast(`Restocked +${qty} units!`,'success');
+    closeRestockModal();
+    loadInventory();
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+// Check URL params
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('filter')==='low_stock') {
+  document.getElementById('filter-stock').value = 'low';
+}
+
+loadInventory();
+</script>
+</body>
+</html>

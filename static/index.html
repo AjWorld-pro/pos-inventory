@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POSIFY — Login</title>
+  <link rel="stylesheet" href="/css/main.css" />
+  <style>
+    .input-icon-wrap { position: relative; }
+    .input-icon-wrap .icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--gray-400); font-size: 16px; }
+    .input-icon-wrap .form-control { padding-left: 40px; }
+    .password-toggle { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--gray-400); font-size: 16px; background: none; border: none; }
+    .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--gray-50); }
+    .auth-right { width: 100%; max-width: 400px; padding: 32px 20px; background: transparent; }
+    .auth-form-box { width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-right">
+      <div class="auth-form-box">
+        <div class="auth-form-logo">
+          <div class="logo-text" style="color:var(--gray-900);font-family:'Playfair Display',Georgia,serif;font-size:20px;font-weight:700;font-style:italic;letter-spacing:1px">POSIFY</div>
+        </div>
+
+        <div class="auth-tabs">
+          <button class="auth-tab active" onclick="switchTab('login')">Sign In</button>
+          <button class="auth-tab" onclick="switchTab('register')">Register</button>
+        </div>
+
+        <!-- Login Form -->
+        <div id="login-form">
+          <h2 class="auth-form-title">Welcome back</h2>
+          <p class="auth-form-sub">Sign in to your POSIFY account</p>
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <div class="input-icon-wrap">
+              <span class="icon">👤</span>
+              <input type="text" class="form-control" id="login-username" placeholder="Enter your username" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <div class="input-icon-wrap">
+              <span class="icon">🔒</span>
+              <input type="password" class="form-control" id="login-password" placeholder="Enter your password" />
+              <button class="password-toggle" onclick="togglePwd('login-password', this)">👁</button>
+            </div>
+          </div>
+          <button class="btn btn-primary w-100 btn-lg" onclick="doLogin()" id="login-btn" style="margin-top:8px">
+            Sign In to POSIFY
+          </button>
+          <p style="text-align:center;margin-top:16px;font-size:13px;color:var(--gray-500)">
+            Don't have an account? <a href="#" onclick="switchTab('register')" style="color:var(--primary);font-weight:600">Register here</a>
+          </p>
+        </div>
+
+        <!-- Register Form -->
+        <div id="register-form" style="display:none">
+          <h2 class="auth-form-title">Create account</h2>
+          <p class="auth-form-sub">Join POSIFY to manage your business</p>
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <div class="input-icon-wrap">
+              <span class="icon">👤</span>
+              <input type="text" class="form-control" id="reg-name" placeholder="Your full name" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <div class="input-icon-wrap">
+              <span class="icon">@</span>
+              <input type="text" class="form-control" id="reg-username" placeholder="Choose a username" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <div class="input-icon-wrap">
+              <span class="icon">✉️</span>
+              <input type="email" class="form-control" id="reg-email" placeholder="you@example.com" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <div class="input-icon-wrap">
+              <span class="icon">🔒</span>
+              <input type="password" class="form-control" id="reg-password" placeholder="Min. 6 characters" />
+              <button class="password-toggle" onclick="togglePwd('reg-password', this)">👁</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Role</label>
+            <select class="form-control" id="reg-role">
+              <option value="user">User — Dashboard & POS access</option>
+              <option value="cashier">Cashier — Dashboard, POS, view inventory</option>
+              <option value="manager">Manager — All cashier + inventory management & reports</option>
+              <option value="admin">Admin — Full system access</option>
+            </select>
+          </div>
+          <button class="btn btn-primary w-100 btn-lg" onclick="doRegister()" id="register-btn" style="margin-top:8px">
+            Create Account
+          </button>
+          <p style="text-align:center;margin-top:16px;font-size:13px;color:var(--gray-500)">
+            Already have an account? <a href="#" onclick="switchTab('login')" style="color:var(--primary);font-weight:600">Sign in</a>
+          </p>
+        </div>
+
+        <div id="auth-error" class="alert alert-danger" style="display:none;margin-top:16px"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    // Redirect if already logged in
+    if (Api.getToken() && Api.getUser()) {
+      window.location.href = '/dashboard.html';
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.auth-tab').forEach((t, i) => t.classList.toggle('active', (tab === 'login' ? i === 0 : i === 1)));
+      document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('register-form').style.display = tab === 'register' ? 'block' : 'none';
+      document.getElementById('auth-error').style.display = 'none';
+    }
+
+    function togglePwd(id, btn) {
+      const inp = document.getElementById(id);
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+    }
+
+    async function doLogin() {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+      const btn = document.getElementById('login-btn');
+      const errEl = document.getElementById('auth-error');
+      errEl.style.display = 'none';
+      if (!username || !password) { showErr('Please fill in all fields'); return; }
+      btn.disabled = true; btn.textContent = 'Signing in…';
+      try {
+        const { token, user } = await Api.login(username, password);
+        Api.setSession(token, user);
+        window.location.href = '/dashboard.html';
+      } catch (e) {
+        showErr(e.message);
+        btn.disabled = false; btn.textContent = 'Sign In to POSIFY';
+      }
+    }
+
+    async function doRegister() {
+      const name = document.getElementById('reg-name').value.trim();
+      const username = document.getElementById('reg-username').value.trim();
+      const email = document.getElementById('reg-email').value.trim();
+      const password = document.getElementById('reg-password').value;
+      const role = document.getElementById('reg-role').value;
+      const btn = document.getElementById('register-btn');
+      const errEl = document.getElementById('auth-error');
+      errEl.style.display = 'none';
+      if (!name || !username || !email || !password) { showErr('Please fill in all fields'); return; }
+      btn.disabled = true; btn.textContent = 'Creating account…';
+      try {
+        const { token, user } = await Api.register(name, username, email, password, role);
+        Api.setSession(token, user);
+        window.location.href = '/dashboard.html';
+      } catch (e) {
+        showErr(e.message);
+        btn.disabled = false; btn.textContent = 'Create Account';
+      }
+    }
+
+    function showErr(msg) {
+      const el = document.getElementById('auth-error');
+      el.textContent = msg; el.style.display = 'flex';
+    }
+
+    // Enter key support
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        if (document.getElementById('login-form').style.display !== 'none') doLogin();
+        else doRegister();
+      }
+    });
+  </script>
+</body>
+</html>

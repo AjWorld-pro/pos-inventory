@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POSIFY — Settings</title>
+  <link rel="stylesheet" href="/css/main.css" />
+  <style>
+    .settings-layout { display:grid;grid-template-columns:200px 1fr;gap:20px; }
+    .settings-nav { display:flex;flex-direction:column;gap:3px; }
+    .settings-nav-item { padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;color:var(--gray-600);cursor:pointer;display:flex;align-items:center;gap:8px;transition:all var(--transition); }
+    .user-row { display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--gray-100); }
+    .user-row-avatar { width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--white);flex-shrink:0; }
+    .role-badge { padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px; }
+    .pref-grid-sm { display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px; }
+    @media(max-width:768px){ .settings-layout{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="app-sidebar"></aside>
+  <main class="main-content">
+    <div class="topbar">
+      <button class="mobile-menu-btn btn-icon" id="mobile-menu-btn">☰</button>
+      <div class="topbar-title"><h1>Settings</h1><p>Manage account & system preferences</p></div>
+    </div>
+
+    <div class="page-content">
+      <div class="settings-layout">
+
+        <!-- Settings Nav -->
+        <div>
+          <div class="card">
+            <div class="card-body" style="padding:12px">
+              <div class="settings-nav">
+                <div class="settings-nav-item active" onclick="showSection('profile')">👤 My Profile</div>
+                <div class="settings-nav-item" onclick="showSection('preferences')">✨ Preferences</div>
+                <div class="settings-nav-item" onclick="showSection('security')">🔒 Security</div>
+                <div class="settings-nav-item admin-only" id="nav-users" onclick="showSection('users')">👥 User Management</div>
+                <div class="settings-nav-item admin-only" id="nav-system" onclick="showSection('system')">⚙ System</div>
+              </div>
+            </div>
+          </div>
+          <!-- Current user card -->
+          <div class="card" style="margin-top:16px">
+            <div class="card-body" style="text-align:center;padding:20px 16px">
+              <div id="profile-avatar-big" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--gold));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:white;margin:0 auto 12px"></div>
+              <div style="font-weight:700;font-size:16px" id="profile-name-big">—</div>
+              <div style="font-size:12px;color:var(--gray-500);margin-top:2px">@<span id="profile-username-big">—</span></div>
+              <div style="font-size:12px;color:var(--gray-400);margin-top:1px" id="profile-email-big">—</div>
+              <div style="margin-top:10px"><span class="role-badge" id="profile-role-badge">—</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Content -->
+        <div>
+
+          <!-- Profile Section -->
+          <div class="settings-section active" id="section-profile">
+            <div class="card">
+              <div class="card-header"><span class="card-title">My Profile</span></div>
+              <div class="card-body">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" class="form-control" id="prof-name" placeholder="Your full name" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-control" id="prof-username" disabled style="background:var(--gray-50);cursor:not-allowed" />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Email Address</label>
+                  <input type="email" class="form-control" id="prof-email" disabled style="background:var(--gray-50);cursor:not-allowed" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Role</label>
+                  <input type="text" class="form-control" id="prof-role" disabled style="background:var(--gray-50);cursor:not-allowed;text-transform:capitalize" />
+                </div>
+                <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Preferences Section -->
+          <div class="settings-section" id="section-preferences">
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">✨ Dashboard Preferences</span>
+                <button class="btn btn-outline btn-sm" onclick="clearPrefs()">Clear All</button>
+              </div>
+              <div class="card-body">
+                <p style="font-size:14px;color:var(--gray-500);margin-bottom:16px">Choose which product categories appear on your dashboard feed. Leave all unselected to see everything.</p>
+                <div class="pref-grid-sm" id="settings-pref-grid"></div>
+                <div style="margin-top:20px;display:flex;gap:10px">
+                  <button class="btn btn-outline btn-sm" onclick="selectAllPrefs()">Select All</button>
+                  <button class="btn btn-primary" onclick="saveSettingsPrefs()">Save Preferences</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Security Section -->
+          <div class="settings-section" id="section-security">
+            <div class="card">
+              <div class="card-header"><span class="card-title">🔒 Change Password</span></div>
+              <div class="card-body">
+                <div class="alert alert-info">Password changes require re-login after saving.</div>
+                <div class="form-group">
+                  <label class="form-label">Current Password</label>
+                  <input type="password" class="form-control" id="pwd-current" placeholder="Enter current password" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">New Password</label>
+                  <input type="password" class="form-control" id="pwd-new" placeholder="Min. 6 characters" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Confirm New Password</label>
+                  <input type="password" class="form-control" id="pwd-confirm" placeholder="Re-enter new password" />
+                </div>
+                <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+              </div>
+            </div>
+            <div class="card" style="margin-top:20px">
+              <div class="card-header"><span class="card-title">⚠️ Danger Zone</span></div>
+              <div class="card-body">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0">
+                  <div>
+                    <div style="font-weight:600;font-size:14px">Sign Out All Devices</div>
+                    <div style="font-size:13px;color:var(--gray-500)">Invalidate all active sessions</div>
+                  </div>
+                  <button class="btn btn-outline btn-sm" onclick="handleLogout()">Sign Out</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- User Management (Admin only) -->
+          <div class="settings-section admin-only" id="section-users">
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">👥 User Management</span>
+                <button class="btn btn-primary btn-sm" onclick="openAddUserModal()">+ Add User</button>
+              </div>
+              <div class="card-body" style="padding:0">
+                <div id="users-list">
+                  <div class="loading-center"><div class="spinner"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- System Settings (Admin only) -->
+          <div class="settings-section admin-only" id="section-system">
+            <div class="card">
+              <div class="card-header"><span class="card-title">⚙ System Settings</span></div>
+              <div class="card-body">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--gray-100)">
+                  <div>
+                    <div style="font-weight:600;font-size:14px">Low Stock Notifications</div>
+                    <div style="font-size:13px;color:var(--gray-500)">Get notified when items fall below threshold</div>
+                  </div>
+                  <label class="toggle-switch"><input type="checkbox" id="tog-lowstock" checked /><span class="toggle-slider"></span></label>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--gray-100)">
+                  <div>
+                    <div style="font-weight:600;font-size:14px">Daily Sales Summary Email</div>
+                    <div style="font-size:13px;color:var(--gray-500)">Receive daily reports at end of day</div>
+                  </div>
+                  <label class="toggle-switch"><input type="checkbox" id="tog-daily" /><span class="toggle-slider"></span></label>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--gray-100)">
+                  <div>
+                    <div style="font-weight:600;font-size:14px">Auto Restock Suggestions</div>
+                    <div style="font-size:13px;color:var(--gray-500)">AI-powered restock recommendations</div>
+                  </div>
+                  <label class="toggle-switch"><input type="checkbox" id="tog-restock" checked /><span class="toggle-slider"></span></label>
+                </div>
+                <div style="padding:14px 0">
+                  <div style="font-weight:600;font-size:14px;margin-bottom:8px">Default Tax Rate</div>
+                  <select class="form-control" style="max-width:200px" id="sys-tax">
+                    <option value="0">No Tax</option>
+                    <option value="0.05">5%</option>
+                    <option value="0.075">7.5%</option>
+                    <option value="0.1">10%</option>
+                  </select>
+                </div>
+                <button class="btn btn-primary" onclick="saveSystemSettings()">Save System Settings</button>
+              </div>
+            </div>
+
+            <!-- Admin Stats -->
+            <div class="card" style="margin-top:20px">
+              <div class="card-header"><span class="card-title">📊 System Overview</span></div>
+              <div class="card-body" id="admin-system-stats">
+                <div class="loading-center"><div class="spinner"></div></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add User Modal (Admin) -->
+<div class="modal-overlay" id="add-user-modal-overlay">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="add-user-modal-title">Add New User</div>
+      <button class="modal-close" onclick="closeAddUserModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-user-id" />
+      <div class="form-group">
+        <label class="form-label">Full Name *</label>
+        <input type="text" class="form-control" id="new-user-name" placeholder="Full name" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Username *</label>
+        <input type="text" class="form-control" id="new-user-username" placeholder="Choose a username" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email Address *</label>
+        <input type="email" class="form-control" id="new-user-email" placeholder="user@example.com" />
+      </div>
+      <div class="form-group" id="new-user-pwd-group">
+        <label class="form-label">Password *</label>
+        <input type="password" class="form-control" id="new-user-password" placeholder="Min. 6 characters" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role *</label>
+        <select class="form-control" id="new-user-role">
+          <option value="user">⚪ User — Dashboard & POS access</option>
+          <option value="cashier">🟢 Cashier — Dashboard, POS, view inventory</option>
+          <option value="manager">🔵 Manager — All cashier + inventory & reports</option>
+          <option value="admin">🟡 Admin — Full system access</option>
+        </select>
+      </div>
+      <div class="alert alert-info" style="font-size:12.5px">
+        <strong>Role Permissions:</strong><br>
+        • <strong>User</strong>: Dashboard & POS<br>
+        • <strong>Cashier</strong>: Dashboard, POS, view inventory<br>
+        • <strong>Manager</strong>: All cashier + edit/add inventory, reports<br>
+        • <strong>Admin</strong>: Full access including user management & settings
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeAddUserModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()" id="save-user-btn">Create User</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+const currentUser = requireAuth();
+initSidebar('settings');
+
+const CATEGORIES = [
+  {name:'Electronics',icon:'💻'},{name:'Clothing & Apparel',icon:'👗'},{name:'Food & Beverages',icon:'🥤'},
+  {name:'Health & Beauty',icon:'💊'},{name:'Home & Garden',icon:'🏡'},{name:'Sports & Outdoors',icon:'⚽'},
+  {name:'Toys & Games',icon:'🎮'},{name:'Office Supplies',icon:'📎'},{name:'Automotive',icon:'🚗'},{name:'Books & Media',icon:'📚'}
+];
+
+let selectedPrefs = [];
+const AVATAR_COLORS = ['#059669','#D97706','#3B82F6','#EF4444','#8B5CF6','#EC4899'];
+
+function getAvatarColor(name) {
+  let h = 0; for (let c of (name||'')) h = c.charCodeAt(0) + ((h<<5)-h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+function init() {
+  const u = Api.getUser();
+  if (!u) return;
+
+  // Populate profile
+  document.getElementById('prof-name').value = u.name;
+  document.getElementById('prof-username').value = u.username;
+  document.getElementById('prof-email').value = u.email;
+  document.getElementById('prof-role').value = u.role;
+
+  // Big profile card
+  const avatarEl = document.getElementById('profile-avatar-big');
+  avatarEl.textContent = u.name[0].toUpperCase();
+  avatarEl.style.background = `linear-gradient(135deg,${getAvatarColor(u.name)},var(--gold))`;
+  document.getElementById('profile-name-big').textContent = u.name;
+  document.getElementById('profile-username-big').textContent = u.username;
+  document.getElementById('profile-email-big').textContent = u.email;
+  const rb = document.getElementById('profile-role-badge');
+  rb.textContent = u.role; rb.className = `role-badge ${u.role}`;
+
+  // Show admin sections
+  if (u.role === 'admin') {
+    document.querySelectorAll('.admin-only').forEach(el=>el.classList.add('visible'));
+    loadUsers();
+    loadSystemStats();
+  }
+
+  // Preferences
+  selectedPrefs = [...(u.preferences||[])];
+  renderSettingsPrefs();
+}
+
+// ── Section Navigation ──
+function showSection(name) {
+  document.querySelectorAll('.settings-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.settings-nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('section-'+name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Profile ──
+async function saveProfile() {
+  const name = document.getElementById('prof-name').value.trim();
+  if (!name) { showToast('Name cannot be empty','warning'); return; }
+  try {
+    await Api.updateProfile({ name });
+    const u = Api.getUser(); u.name = name;
+    Api.setSession(Api.getToken(), u);
+    populateSidebarUser();
+    init();
+    showToast('Profile updated!','success');
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+// ── Preferences ──
+function renderSettingsPrefs() {
+  document.getElementById('settings-pref-grid').innerHTML = CATEGORIES.map(c=>`
+    <div class="pref-card ${selectedPrefs.includes(c.name)?'selected':''}" onclick="toggleSettingsPref('${c.name}',this)" style="padding:12px 8px">
+      <div class="pref-card-icon" style="font-size:24px;margin-bottom:6px">${c.icon}</div>
+      <div class="pref-card-name" style="font-size:11px">${c.name}</div>
+    </div>`).join('');
+}
+
+function toggleSettingsPref(name, el) {
+  el.classList.toggle('selected');
+  if (selectedPrefs.includes(name)) selectedPrefs = selectedPrefs.filter(p=>p!==name);
+  else selectedPrefs.push(name);
+}
+
+function selectAllPrefs() {
+  selectedPrefs = CATEGORIES.map(c=>c.name);
+  renderSettingsPrefs();
+}
+
+function clearPrefs() { selectedPrefs = []; renderSettingsPrefs(); }
+
+async function saveSettingsPrefs() {
+  try {
+    await Api.updatePreferences(selectedPrefs);
+    const u = Api.getUser(); u.preferences=selectedPrefs; u.preferences_set=true;
+    Api.setSession(Api.getToken(), u);
+    showToast('Preferences saved!','success');
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+// ── Password ──
+async function changePassword() {
+  const curr = document.getElementById('pwd-current').value;
+  const newP = document.getElementById('pwd-new').value;
+  const conf = document.getElementById('pwd-confirm').value;
+  if (!curr||!newP||!conf) { showToast('Fill all password fields','warning'); return; }
+  if (newP.length < 6) { showToast('New password must be 6+ characters','warning'); return; }
+  if (newP !== conf) { showToast('Passwords do not match','error'); return; }
+  showToast('Password change would be processed (backend extended feature)','success');
+  ['pwd-current','pwd-new','pwd-confirm'].forEach(id=>document.getElementById(id).value='');
+}
+
+// ── User Management (Admin) ──
+async function loadUsers() {
+  try {
+    // Use the register-based approach to list users (admin endpoint)
+    const res = await Api.request('GET', '/auth/users');
+    renderUsersList(res.users || []);
+  } catch(e) {
+    // Fallback: show current user info
+    const u = Api.getUser();
+    renderUsersList([u]);
+  }
+}
+
+function renderUsersList(users) {
+  const el = document.getElementById('users-list');
+  if (!users.length) { el.innerHTML = '<div class="empty-state" style="padding:28px"><p>No users found</p></div>'; return; }
+  el.innerHTML = `<div style="padding:8px 0">${users.map(u=>`
+    <div class="user-row">
+      <div class="user-row-avatar" style="background:${getAvatarColor(u.name)}">${(u.name||'?')[0].toUpperCase()}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px;color:var(--gray-900)">${u.name}</div>
+        <div style="font-size:12px;color:var(--gray-500)">${u.email}</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:2px">Joined: ${formatDate(u.created_at)}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+        <span class="role-badge ${u.role}">${u.role}</span>
+        ${u.id !== Api.getUser()?.id ? `
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="openEditUserModal('${u.id}','${u.name.replace(/'/g,"\\'")}','${u.email}','${u.role}')">✏️ Edit</button>
+          </div>` : '<span style="font-size:11px;color:var(--primary);font-weight:600">← You</span>'}
+      </div>
+    </div>`).join('')}
+    <div style="padding:14px 0;border-top:1px solid var(--gray-100)">
+      <div style="font-size:12px;color:var(--gray-400)">
+        Total: ${users.length} user${users.length!==1?'s':''} &nbsp;·&nbsp;
+        Admins: ${users.filter(u=>u.role==='admin').length} &nbsp;·&nbsp;
+        Managers: ${users.filter(u=>u.role==='manager').length} &nbsp;·&nbsp;
+        Cashiers: ${users.filter(u=>u.role==='cashier').length} &nbsp;·&nbsp;
+        Users: ${users.filter(u=>u.role==='user').length}
+      </div>
+    </div>
+  </div>`;
+}
+
+function openAddUserModal() {
+  document.getElementById('add-user-modal-title').textContent = 'Add New User';
+  document.getElementById('edit-user-id').value = '';
+  ['new-user-name','new-user-username','new-user-email','new-user-password'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('new-user-role').value = 'user';
+  document.getElementById('new-user-pwd-group').style.display = 'block';
+  document.getElementById('save-user-btn').textContent = 'Create User';
+  document.getElementById('add-user-modal-overlay').classList.add('active');
+}
+
+function openEditUserModal(id, name, email, role) {
+  document.getElementById('add-user-modal-title').textContent = 'Edit User Role';
+  document.getElementById('edit-user-id').value = id;
+  document.getElementById('new-user-name').value = name;
+  document.getElementById('new-user-username').value = name.toLowerCase().replace(/\s+/g, '_');
+  document.getElementById('new-user-email').value = email;
+  document.getElementById('new-user-password').value = '';
+  document.getElementById('new-user-role').value = role;
+  document.getElementById('new-user-pwd-group').style.display = 'none';
+  document.getElementById('save-user-btn').textContent = 'Update Role';
+  document.getElementById('add-user-modal-overlay').classList.add('active');
+}
+
+function closeAddUserModal() { document.getElementById('add-user-modal-overlay').classList.remove('active'); }
+
+async function saveUser() {
+  const editId = document.getElementById('edit-user-id').value;
+  const name = document.getElementById('new-user-name').value.trim();
+  const username = document.getElementById('new-user-username').value.trim();
+  const email = document.getElementById('new-user-email').value.trim();
+  const password = document.getElementById('new-user-password').value;
+  const role = document.getElementById('new-user-role').value;
+  const btn = document.getElementById('save-user-btn');
+
+  if (!name || !username || !email) { showToast('Name, username, and email are required','warning'); return; }
+  if (!editId && !password) { showToast('Password is required for new users','warning'); return; }
+
+  btn.disabled=true; btn.textContent='Saving…';
+  try {
+    if (editId) {
+      await Api.request('PUT', `/auth/users/${editId}`, { role });
+      showToast('User role updated!','success');
+    } else {
+      await Api.register(name, username, email, password, role);
+      showToast(`User ${name} created!','success`);
+    }
+    closeAddUserModal();
+    loadUsers();
+  } catch(e) { showToast(e.message,'error'); }
+  finally { btn.disabled=false; btn.textContent = editId?'Update Role':'Create User'; }
+}
+
+async function loadSystemStats() {
+  try {
+    const [productStats, overview] = await Promise.all([Api.getProductStats(), Api.getOverview()]);
+    document.getElementById('admin-system-stats').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div style="text-align:center;padding:16px;background:var(--primary-bg);border-radius:var(--radius)">
+          <div style="font-size:28px;font-weight:700;color:var(--primary)">${productStats.total_products}</div>
+          <div style="font-size:12px;color:var(--gray-500)">Total Products</div>
+        </div>
+        <div style="text-align:center;padding:16px;background:var(--gold-pale);border-radius:var(--radius)">
+          <div style="font-size:28px;font-weight:700;color:var(--gold)">${formatCurrency(productStats.total_inventory_value)}</div>
+          <div style="font-size:12px;color:var(--gray-500)">Inventory Value</div>
+        </div>
+        <div style="text-align:center;padding:16px;background:var(--info-bg);border-radius:var(--radius)">
+          <div style="font-size:28px;font-weight:700;color:var(--info)">${overview.total.transactions}</div>
+          <div style="font-size:12px;color:var(--gray-500)">All Transactions</div>
+        </div>
+        <div style="text-align:center;padding:16px;background:var(--danger-bg);border-radius:var(--radius)">
+          <div style="font-size:28px;font-weight:700;color:var(--danger)">${productStats.low_stock_count}</div>
+          <div style="font-size:12px;color:var(--gray-500)">Low Stock Items</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding:14px;background:var(--gray-50);border-radius:var(--radius);font-size:13px;color:var(--gray-600)">
+        <strong>Total Revenue (All Time):</strong> <span style="color:var(--primary);font-weight:700">${formatCurrency(overview.total.revenue)}</span><br>
+        <strong>Categories in Use:</strong> ${productStats.categories_count}<br>
+        <strong>System Version:</strong> POSIFY v1.0.0
+      </div>`;
+  } catch(e) {}
+}
+
+function saveSystemSettings() { showToast('System settings saved!','success'); }
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POSIFY — Dashboard</title>
+  <link rel="stylesheet" href="/css/main.css" />
+  <style>
+    .feed-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .pref-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+    .pref-chip { padding:4px 12px; border-radius:20px; background:var(--primary-bg); color:var(--primary-dark); font-size:11px; font-weight:600; border:1.5px solid var(--primary-bg2); cursor:pointer; transition:all var(--transition); }
+    .pref-chip.active, .pref-chip:hover { background:var(--primary); color:var(--white); border-color:var(--primary); }
+    .dashboard-grid { display:grid; grid-template-columns: 1fr 320px; gap:18px; }
+    .recent-txn { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--gray-100); }
+    .txn-icon { width:30px; height:30px; border-radius:6px; background:var(--primary-bg); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+    .activity-dot { width:6px; height:6px; border-radius:50%; background:var(--primary); flex-shrink:0; }
+    @media(max-width:900px) { .dashboard-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="app-sidebar"></aside>
+  <main class="main-content">
+    <div class="topbar">
+      <button class="mobile-menu-btn btn-icon" id="mobile-menu-btn">☰</button>
+      <div class="topbar-title">
+        <h1>Dashboard</h1>
+        <p id="topbar-date">Loading…</p>
+      </div>
+      <div class="topbar-search">
+        <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="Search products, categories…" id="global-search" oninput="handleSearch(this.value)" />
+      </div>
+      <div class="topbar-actions">
+        <div style="position:relative">
+          <button class="btn-icon" id="notif-btn" onclick="toggleNotif()">
+            🔔<span class="badge" id="notif-badge" style="display:none"></span>
+          </button>
+          <div class="notif-panel" id="notif-panel"></div>
+        </div>
+        <a href="/pos.html" class="btn btn-primary btn-sm">🛒 New Sale</a>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <!-- Stats Grid -->
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card"><div class="stat-icon green">📦</div><div class="stat-info"><div class="stat-value" id="stat-products">—</div><div class="stat-label">Total Products</div></div></div>
+        <div class="stat-card"><div class="stat-icon gold">💰</div><div class="stat-info"><div class="stat-value" id="stat-revenue">—</div><div class="stat-label">Today's Revenue</div><div class="stat-change up" id="stat-revenue-change"></div></div></div>
+        <div class="stat-card"><div class="stat-icon blue">🧾</div><div class="stat-info"><div class="stat-value" id="stat-txns">—</div><div class="stat-label">Today's Sales</div></div></div>
+        <div class="stat-card"><div class="stat-icon red">⚠️</div><div class="stat-info"><div class="stat-value" id="stat-lowstock">—</div><div class="stat-label">Low Stock Items</div></div></div>
+      </div>
+
+      <!-- Low stock alert -->
+      <div id="low-stock-alert" style="display:none" class="low-stock-banner">
+        <span style="font-size:16px">⚠️</span>
+        <div>
+          <strong>Low Stock Alert:</strong> <span id="low-stock-msg"></span>
+          <a href="/inventory.html?filter=low_stock" style="color:var(--gold);font-weight:700;margin-left:8px">View items →</a>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <!-- Left: Product Feed -->
+        <div>
+          <div class="feed-header">
+            <div>
+              <h2 class="card-title">Your Product Feed</h2>
+              <p style="font-size:12px;color:var(--gray-500);margin-top:1px" id="feed-subtitle">Showing all products</p>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="openPrefModal()">⚙ Preferences</button>
+          </div>
+
+          <!-- Category filter chips -->
+          <div class="pref-chips" id="pref-chips"></div>
+
+          <!-- Product grid -->
+          <div class="products-grid" id="products-feed">
+            <div class="loading-center"><div class="spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- Right: Sidebar panels -->
+        <div>
+          <!-- Recent Transactions -->
+          <div class="card mb-20">
+            <div class="card-header">
+              <span class="card-title">Recent Sales</span>
+              <a href="/reports.html" style="font-size:13px;color:var(--primary);font-weight:600">View all</a>
+            </div>
+            <div class="card-body" style="padding:8px 16px" id="recent-txns">
+              <div class="loading-center"><div class="spinner"></div></div>
+            </div>
+          </div>
+
+          <!-- Low Stock Items -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">⚠️ Low Stock</span>
+              <a href="/inventory.html" style="font-size:13px;color:var(--gold);font-weight:600">Restock</a>
+            </div>
+            <div class="card-body" style="padding:8px 16px" id="low-stock-list">
+              <div class="loading-center"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Preferences Modal -->
+<div class="modal-overlay" id="pref-modal-overlay">
+  <div class="modal pref-modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Personalize Your Feed</div>
+        <p style="font-size:12px;color:var(--gray-500);margin-top:2px">Choose product categories to see on your dashboard</p>
+      </div>
+      <button class="modal-close" onclick="closePrefModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="pref-grid" id="pref-category-grid"></div>
+      <p style="font-size:12px;color:var(--gray-400);margin-top:12px;text-align:center">Select categories or leave empty to see everything</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="skipPreferences()">Skip for Now</button>
+      <button class="btn btn-primary" onclick="savePreferences()">Save Preferences</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/sidebar.js"></script>
+<script>
+const user = requireAuth();
+initSidebar('dashboard');
+
+const CATEGORIES = [
+  { name: 'Electronics', icon: '💻' },
+  { name: 'Clothing & Apparel', icon: '👗' },
+  { name: 'Food & Beverages', icon: '🥤' },
+  { name: 'Health & Beauty', icon: '💊' },
+  { name: 'Home & Garden', icon: '🏡' },
+  { name: 'Sports & Outdoors', icon: '⚽' },
+  { name: 'Toys & Games', icon: '🎮' },
+  { name: 'Office Supplies', icon: '📎' },
+  { name: 'Automotive', icon: '🚗' },
+  { name: 'Books & Media', icon: '📚' },
+];
+
+let allProducts = [];
+let activeFilter = '';
+
+// Set date
+document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+async function loadDashboard() {
+  try {
+    const [statsRes, overviewRes, txnsRes, lowStockRes] = await Promise.all([
+      Api.getProductStats(),
+      Api.getOverview(),
+      Api.getTransactions({ limit: 5 }),
+      Api.getProducts({ low_stock: true })
+    ]);
+
+    // Stats
+    document.getElementById('stat-products').textContent = statsRes.total_products;
+    document.getElementById('stat-revenue').textContent = formatCurrency(overviewRes.today.revenue);
+    document.getElementById('stat-txns').textContent = overviewRes.today.transactions;
+    document.getElementById('stat-lowstock').textContent = statsRes.low_stock_count;
+
+    // Revenue change
+    const change = overviewRes.today.revenue - overviewRes.yesterday.revenue;
+    const changeEl = document.getElementById('stat-revenue-change');
+    if (overviewRes.yesterday.revenue > 0) {
+      const pct = ((change / overviewRes.yesterday.revenue) * 100).toFixed(1);
+      changeEl.textContent = (change >= 0 ? '↑ ' : '↓ ') + Math.abs(pct) + '% vs yesterday';
+      changeEl.className = 'stat-change ' + (change >= 0 ? 'up' : 'down');
+    }
+
+    // Low stock alert
+    if (lowStockRes.products.length > 0) {
+      document.getElementById('low-stock-alert').style.display = 'flex';
+      const names = lowStockRes.products.slice(0,3).map(p => p.name).join(', ');
+      document.getElementById('low-stock-msg').textContent = `${lowStockRes.products.length} item(s) need restocking: ${names}${lowStockRes.products.length > 3 ? '…' : ''}`;
+    }
+
+    // Recent transactions
+    renderRecentTxns(txnsRes.transactions.slice(0, 5));
+
+    // Low stock sidebar
+    renderLowStockSidebar(lowStockRes.products.slice(0, 5));
+
+    // Notifications
+    buildNotifications(lowStockRes.products, overviewRes);
+
+  } catch(e) { showToast('Error loading dashboard: ' + e.message, 'error'); }
+}
+
+function renderRecentTxns(txns) {
+  const el = document.getElementById('recent-txns');
+  if (!txns.length) { el.innerHTML = '<div class="empty-state" style="padding:20px"><div class="empty-state-icon">🧾</div><p>No sales yet today</p></div>'; return; }
+  el.innerHTML = txns.map(t => `
+    <div class="recent-txn">
+      <div class="txn-icon">🧾</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--gray-800)">${t.receipt_number}</div>
+        <div style="font-size:11px;color:var(--gray-400)">${formatDateTime(t.created_at)}</div>
+      </div>
+      <div style="font-size:14px;font-weight:700;color:var(--primary)">${formatCurrency(t.total)}</div>
+    </div>`).join('');
+}
+
+function renderLowStockSidebar(items) {
+  const el = document.getElementById('low-stock-list');
+  if (!items.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--gray-400);font-size:13px">✅ All items well-stocked!</div>'; return; }
+  el.innerHTML = items.map(p => `
+    <div class="recent-txn">
+      <div class="txn-icon" style="background:var(--gold-pale);color:var(--gold)">📦</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--gray-800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+        <div style="font-size:11px;color:var(--warning);font-weight:600">${p.quantity} left (min: ${p.low_stock_threshold})</div>
+      </div>
+    </div>`).join('');
+}
+
+function buildNotifications(lowStock, overview) {
+  const panel = document.getElementById('notif-panel');
+  const badge = document.getElementById('notif-badge');
+  const notifs = [];
+  lowStock.slice(0,3).forEach(p => notifs.push({ type:'warning', text:`Low stock: <strong>${p.name}</strong> (${p.quantity} left)`, time:'Just now' }));
+  if (overview.today.revenue > 0) notifs.unshift({ type:'success', text:`Today's revenue: <strong>${formatCurrency(overview.today.revenue)}</strong>`, time:'Today' });
+  if (notifs.length) { badge.style.display = 'block'; }
+  panel.innerHTML = `<div class="notif-header">Notifications <span style="font-size:12px;color:var(--primary)">${notifs.length} new</span></div>` +
+    notifs.map(n => `<div class="notif-item"><div class="notif-dot ${n.type}"></div><div><div class="notif-text">${n.text}</div><div class="notif-time">${n.time}</div></div></div>`).join('') +
+    (notifs.length === 0 ? '<div style="padding:20px;text-align:center;color:var(--gray-400);font-size:13px">No new notifications</div>' : '');
+}
+
+function toggleNotif() {
+  document.getElementById('notif-panel').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#notif-btn') && !e.target.closest('#notif-panel')) {
+    document.getElementById('notif-panel').classList.remove('open');
+  }
+});
+
+async function loadProductFeed() {
+  const currentUser = Api.getUser();
+  const prefs = currentUser?.preferences || [];
+  const params = {};
+  if (prefs.length && !activeFilter) params.preferences = prefs;
+  if (activeFilter) params.category = activeFilter;
+
+  // Update subtitle
+  const subtitle = document.getElementById('feed-subtitle');
+  subtitle.textContent = prefs.length && !activeFilter ? `Filtered by your preferences (${prefs.length} categories)` :
+    activeFilter ? `Showing: ${activeFilter}` : 'Showing all products';
+
+  try {
+    const { products } = await Api.getProducts(params);
+    allProducts = products;
+    renderProductFeed(products);
+  } catch(e) {
+    document.getElementById('products-feed').innerHTML = '<div class="empty-state"><p>Failed to load products</p></div>';
+  }
+}
+
+function renderProductFeed(products) {
+  const grid = document.getElementById('products-feed');
+  if (!products.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">📦</div><h3>No products found</h3><p>Try adjusting your preferences or search</p></div>';
+    return;
+  }
+  grid.innerHTML = products.slice(0, 20).map(p => `
+    <div class="product-card" onclick="window.location.href='/inventory.html'">
+      <div class="product-card-img-placeholder"><img src="${p.image}" alt="${p.name}" onerror="this.remove();this.parentElement.textContent='${CATEGORY_ICONS[p.category]||'📦'}'" /></div>
+      <div class="product-card-body">
+        <div class="product-card-category">${p.category}</div>
+        <div class="product-card-name" title="${p.name}">${p.name}</div>
+        <div class="product-card-footer">
+          <div class="product-price">${formatCurrency(p.price)}</div>
+          <div class="product-qty ${p.is_out_of_stock ? 'out' : p.is_low_stock ? 'low' : ''}">
+            ${p.is_out_of_stock ? '❌ Out of stock' : p.is_low_stock ? '⚠️ ' + p.quantity + ' left' : p.quantity + ' in stock'}
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function buildPrefChips() {
+  const currentUser = Api.getUser();
+  const prefs = currentUser?.preferences || [];
+  const chips = document.getElementById('pref-chips');
+  const cats = prefs.length ? prefs : CATEGORIES.slice(0,6).map(c => c.name);
+  chips.innerHTML = `<span class="pref-chip ${!activeFilter ? 'active' : ''}" onclick="setFilter('')">All</span>` +
+    cats.map(c => `<span class="pref-chip ${activeFilter === c ? 'active' : ''}" onclick="setFilter('${c}')">${CATEGORY_ICONS[c] || ''} ${c}</span>`).join('');
+}
+
+function setFilter(cat) {
+  activeFilter = cat;
+  buildPrefChips();
+  loadProductFeed();
+}
+
+function handleSearch(q) {
+  if (!q) { renderProductFeed(allProducts); return; }
+  const filtered = allProducts.filter(p => p.name.toLowerCase().includes(q.toLowerCase()) || p.category.toLowerCase().includes(q.toLowerCase()));
+  renderProductFeed(filtered);
+}
+
+// --- Preferences Modal ---
+let selectedPrefs = [];
+
+function openPrefModal() {
+  const currentUser = Api.getUser();
+  selectedPrefs = [...(currentUser?.preferences || [])];
+  renderPrefGrid();
+  document.getElementById('pref-modal-overlay').classList.add('active');
+}
+
+function closePrefModal() {
+  document.getElementById('pref-modal-overlay').classList.remove('active');
+}
+
+function renderPrefGrid() {
+  document.getElementById('pref-category-grid').innerHTML = CATEGORIES.map(c => `
+    <div class="pref-card ${selectedPrefs.includes(c.name) ? 'selected' : ''}" onclick="togglePref('${c.name}', this)">
+      <div class="pref-card-icon">${c.icon}</div>
+      <div class="pref-card-name">${c.name}</div>
+    </div>`).join('');
+}
+
+function togglePref(name, el) {
+  el.classList.toggle('selected');
+  if (selectedPrefs.includes(name)) selectedPrefs = selectedPrefs.filter(p => p !== name);
+  else selectedPrefs.push(name);
+}
+
+async function savePreferences() {
+  try {
+    await Api.updatePreferences(selectedPrefs);
+    const u = Api.getUser();
+    u.preferences = selectedPrefs;
+    u.preferences_set = true;
+    Api.setSession(Api.getToken(), u);
+    closePrefModal();
+    showToast('Preferences saved!', 'success');
+    buildPrefChips();
+    loadProductFeed();
+  } catch(e) { showToast('Failed to save preferences', 'error'); }
+}
+
+async function skipPreferences() {
+  try {
+    await Api.updatePreferences([]);
+    const u = Api.getUser();
+    u.preferences = []; u.preferences_set = true;
+    Api.setSession(Api.getToken(), u);
+    closePrefModal();
+    showToast('Showing all products', 'success');
+    loadProductFeed();
+  } catch(e) { closePrefModal(); }
+}
+
+// Show preferences on first login
+function checkFirstLogin() {
+  const currentUser = Api.getUser();
+  if (!currentUser?.preferences_set) {
+    setTimeout(() => openPrefModal(), 800);
+  }
+}
+
+// Init
+loadDashboard();
+loadProductFeed();
+buildPrefChips();
+checkFirstLogin();
+</script>
+</body>
+</html>
