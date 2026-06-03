@@ -97,30 +97,6 @@ python app.py
 
 Open http://localhost:5000 and log in with admin / admin123.
 
----
-
-## Deploy on Render (Recommended)
-
-1. Push to GitHub
-2. Go to render.com > New > Web Service
-3. Connect your GitHub repo
-4. Render auto-detects render.yaml - click Deploy
-
-Important: Add a Disk in Render settings (path: /opt/render/project/src/data, 1GB) for JSON data persistence.
-
----
-
-## Deploy on Vercel
-
-```
-npm install -g vercel
-vercel --prod
-```
-
-Note: Vercel is serverless - data won't persist between requests. Use Render for full persistence.
-
----
-
 ## Role Permissions
 
 | Feature                    | Cashier | Manager | Admin |
