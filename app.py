@@ -50,7 +50,7 @@ def seed_data():
     # Seed admin user
     if not User.get_by_username("admin"):
         User.register("Admin User", "admin", "admin@posify.com", "admin123", "admin")
-        print("✓ Admin user seeded: admin / admin123")
+        print("[OK] Admin user seeded: admin / admin123")
 
     # Seed products
     if not Product.get_all():
@@ -78,12 +78,12 @@ def seed_data():
         ]
         for p in sample_products:
             Product.create(**p)
-        print(f"✓ {len(sample_products)} sample products seeded")
+        print(f"[OK] {len(sample_products)} sample products seeded")
 
 
 app = create_app()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"POS Inventory System running on http://localhost:{port}")
+    print("POS inventory running on http://localhost:" + str(port))
     app.run(host="0.0.0.0", port=port, debug=os.environ.get("FLASK_DEBUG", "false").lower() == "true")
