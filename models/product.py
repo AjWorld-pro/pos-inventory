@@ -26,7 +26,7 @@ class Product:
         self.price = round(float(price), 2)
         self.quantity = int(quantity)
         self.description = description
-        self.image = image or "https://placehold.co/600x400/10B981/ffffff?text=POSIFY"
+        self.image = image or "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300&h=200&fit=crop"
         self.low_stock_threshold = low_stock_threshold or self.LOW_STOCK_DEFAULT
         self.created_at = created_at or datetime.utcnow().isoformat()
         self.updated_at = updated_at or datetime.utcnow().isoformat()
